@@ -6,9 +6,6 @@
   <title>ระบบยืม-คืนอุปกรณ์กีฬา</title>
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
   <script src="/_sdk/element_sdk.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet">
   <style>
         * { font-family: 'Prompt', sans-serif; }
@@ -20,8 +17,6 @@
         .status-pending { background: #fef3c7; color: #92400e; }
         .status-borrowed { background: #dbeafe; color: #1e40af; }
         .status-returned { background: #d1fae5; color: #065f46; }
-        .status-approved { background: #dcfce7; color: #166534; }
-        .equipment-card { transition: all 0.3s ease; }
         @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
         .animate-fadeIn { animation: fadeIn 0.3s ease-out; }
         .toast { animation: slideIn 0.3s ease-out; }
@@ -35,25 +30,25 @@
   <div id="app" class="h-full overflow-auto"><!-- Login Screen -->
    <div id="login-screen" class="login-container">
     <div class="w-full max-w-md px-6">
-     <div class="bg-white rounded-2xl shadow-2xl overflow-hidden animate-fadeIn"><!-- Header -->
+     <div class="bg-white rounded-2xl shadow-2xl overflow-hidden animate-fadeIn">
       <div class="bg-gradient-to-r from-emerald-500 to-teal-600 px-6 py-8 text-center">
        <div class="text-6xl mb-3">
         🏀
        </div>
        <h1 class="text-2xl font-bold text-white mb-1">ระบบยืม-คืนอุปกรณ์</h1>
        <p class="text-emerald-100">ยินดีต้อนรับ</p>
-      </div><!-- Login Form -->
-      <div class="p-8"><!-- User Type Selection -->
+      </div>
+      <div class="p-8">
        <div class="mb-6"><label class="block text-sm font-semibold text-gray-700 mb-3">ประเภทผู้ใช้</label>
         <div class="flex gap-3"><button type="button" id="btn-student-role" onclick="setUserRole('student')" class="flex-1 py-3 px-4 bg-emerald-100 hover:bg-emerald-200 border-2 border-emerald-500 text-emerald-700 rounded-xl font-medium transition-all"> 👨‍🎓 นักเรียน </button> <button type="button" id="btn-admin-role" onclick="setUserRole('admin')" class="flex-1 py-3 px-4 bg-gray-100 hover:bg-gray-200 border-2 border-gray-300 text-gray-700 rounded-xl font-medium transition-all"> 🔐 แอดมิน </button>
         </div>
-       </div><!-- Student Login Form -->
+       </div>
        <form id="student-login-form" onsubmit="loginStudent(event)" class="space-y-4">
         <div><label class="block text-sm font-medium text-gray-700 mb-1">ชื่อ-นามสกุล *</label> <input type="text" id="student-name-input" required class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent" placeholder="กรอกชื่อ-นามสกุล">
         </div>
         <div><label class="block text-sm font-medium text-gray-700 mb-1">รหัสนักเรียน *</label> <input type="text" id="student-id-input" required class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent" placeholder="กรอกรหัสนักเรียน">
         </div><button type="submit" class="w-full py-3 btn-primary text-white rounded-xl font-semibold transition-all"> 🔓 เข้าสู่ระบบ </button>
-       </form><!-- Admin Login Form -->
+       </form>
        <form id="admin-login-form" class="hidden space-y-4" onsubmit="loginAdmin(event)">
         <div><label class="block text-sm font-medium text-gray-700 mb-1">รหัสผ่านแอดมิน *</label> <input type="password" id="admin-password-input" required class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent" placeholder="กรอกรหัสผ่าน">
         </div><button type="submit" class="w-full py-3 bg-gray-800 hover:bg-gray-900 text-white rounded-xl font-semibold transition-all"> 🔓 เข้าสู่ระบบแอดมิน </button>
@@ -86,7 +81,7 @@
     </nav><!-- Admin Dashboard Tab -->
     <nav id="admin-nav" class="hidden bg-white border-b">
      <div class="max-w-7xl mx-auto px-4">
-      <div class="flex gap-2 py-3"><button onclick="switchAdminTab('dashboard')" id="tab-dashboard" class="tab-active px-6 py-2.5 rounded-full font-medium transition-all"> 📊 แดชบอร์ด </button> <button onclick="switchAdminTab('requests')" id="tab-requests" class="px-6 py-2.5 rounded-full font-medium bg-gray-100 hover:bg-gray-200 transition-all"> ⏳ รองรับการคืน </button> <button onclick="switchAdminTab('equipment')" id="tab-equipment" class="px-6 py-2.5 rounded-full font-medium bg-gray-100 hover:bg-gray-200 transition-all"> ⚙️ จัดการอุปกรณ์ </button>
+      <div class="flex gap-2 py-3"><button onclick="switchAdminTab('dashboard')" id="tab-dashboard" class="tab-active px-6 py-2.5 rounded-full font-medium transition-all"> 📊 แดชบอร์ด </button> <button onclick="switchAdminTab('requests')" id="tab-requests" class="px-6 py-2.5 rounded-full font-medium bg-gray-100 hover:bg-gray-200 transition-all"> ⏳ ตรวจสอบยืม-คืน </button>
       </div>
      </div>
     </nav><!-- Main Content -->
@@ -135,16 +130,9 @@
        </div>
       </div>
      </section><!-- Admin Requests Tab -->
-     <section id="content-requests" class="hidden space-y-6">
-      <h2 class="text-2xl font-bold text-gray-800 mb-4">ตรวจสอบการคืนอุปกรณ์</h2>
-      <div id="admin-pending-list" class="space-y-4"><!-- Pending returns will be rendered here -->
-      </div>
-     </section><!-- Admin Equipment Tab -->
-     <section id="content-equipment" class="hidden space-y-6">
-      <div class="flex justify-between items-center mb-4">
-       <h2 class="text-2xl font-bold text-gray-800">จัดการอุปกรณ์</h2><button onclick="openEquipmentModal()" class="px-4 py-2 btn-primary text-white rounded-lg font-medium"> ➕ เพิ่มอุปกรณ์ใหม่ </button>
-      </div>
-      <div id="admin-equipment-list" class="space-y-4"><!-- Equipment list will be rendered here -->
+     <section id="content-requests" class="hidden">
+      <h2 class="text-2xl font-bold text-gray-800 mb-6">ตรวจสอบการยืม-คืนอุปกรณ์</h2>
+      <div id="admin-pending-list" class="space-y-6"><!-- Pending returns will be rendered here -->
       </div>
      </section>
     </main>
@@ -197,33 +185,9 @@
    <div id="toast-container" class="fixed top-24 right-4 z-[70] space-y-2"></div>
   </div>
   <script>
-        // Firebase Configuration
-        const firebaseConfig = {
-            apiKey: "AIzaSyCCcPHPBC3GYPB2UZIrlfOOuf6nZh_giAk",
-            authDomain: "e-sportsupply-borrowing.firebaseapp.com",
-            databaseURL: "https://e-sportsupply-borrowing-default-rtdb.firebaseio.com",
-            projectId: "e-sportsupply-borrowing",
-            storageBucket: "e-sportsupply-borrowing.firebasestorage.app",
-            messagingSenderId: "572790206354",
-            appId: "1:572790206354:web:8fb3a3c220494554b8db4b",
-            measurementId: "G-NC0WZTT9R6"
-        };
-
-        let db, storage;
-        let isFirebaseInitialized = false;
-
-        try {
-            firebase.initializeApp(firebaseConfig);
-            db = firebase.firestore();
-            storage = firebase.storage();
-            isFirebaseInitialized = true;
-        } catch (error) {
-            console.error("Firebase initialization error:", error);
-        }
-
         // Global State
         let currentUser = null;
-        let currentUserRole = null; // 'student' or 'admin'
+        let currentUserRole = null;
         let equipmentData = [
             { id: "basketball", name: "ลูกบาสเกตบอล", icon: "🏀", total: 10, available: 10 },
             { id: "football", name: "ลูกฟุตบอล", icon: "⚽", total: 15, available: 15 },
@@ -302,7 +266,6 @@
                 updateAdminDashboard();
             }
 
-            loadBorrowRecords();
             setMinReturnDate();
         }
 
@@ -399,26 +362,15 @@
                 borrowDate: new Date().toISOString(),
                 status: 'borrowed',
                 returnPhoto: null,
-                actualReturnDate: null
+                actualReturnDate: null,
+                id: 'local_' + Date.now()
             };
 
-            try {
-                if (isFirebaseInitialized && db) {
-                    const docRef = await db.collection('borrowRecords').add(record);
-                    record.id = docRef.id;
-                } else {
-                    record.id = 'local_' + Date.now();
-                }
-
-                borrowRecords.push(record);
-                equipment.available -= record.quantity;
-                renderEquipment();
-                closeBorrowModal();
-                showToast('ยืมอุปกรณ์สำเร็จ!', 'success');
-            } catch (error) {
-                console.error("Error:", error);
-                showToast('เกิดข้อผิดพลาด กรุณาลองใหม่', 'error');
-            }
+            borrowRecords.push(record);
+            equipment.available -= record.quantity;
+            renderEquipment();
+            closeBorrowModal();
+            showToast('ยืมอุปกรณ์สำเร็จ!', 'success');
 
             btn.disabled = false;
             btn.innerHTML = 'ยืนยันการยืม';
@@ -524,18 +476,6 @@
                 record.returnPhoto = photoBase64;
                 record.actualReturnDate = new Date().toISOString();
 
-                if (isFirebaseInitialized && db) {
-                    try {
-                        await db.collection('borrowRecords').doc(borrowId).update({
-                            status: 'pending',
-                            returnPhoto: photoBase64,
-                            actualReturnDate: record.actualReturnDate
-                        });
-                    } catch (fbError) {
-                        console.warn('Firebase save warning - data saved locally:', fbError.message);
-                    }
-                }
-
                 closeReturnModal();
                 renderReturnList();
                 showToast('ส่งคำขอคืนสำเร็จ! รอการอนุมัติ', 'success');
@@ -584,7 +524,7 @@
 
         // ===== ADMIN FUNCTIONS =====
         function switchAdminTab(tab) {
-            ['dashboard', 'requests', 'equipment'].forEach(t => {
+            ['dashboard', 'requests'].forEach(t => {
                 document.getElementById(`tab-${t}`).classList.remove('tab-active');
                 document.getElementById(`tab-${t}`).classList.add('bg-gray-100');
                 document.getElementById(`content-${t}`).classList.add('hidden');
@@ -594,7 +534,6 @@
             document.getElementById(`content-${tab}`).classList.remove('hidden');
 
             if (tab === 'requests') renderAdminPending();
-            if (tab === 'equipment') renderAdminEquipment();
         }
 
         function updateAdminDashboard() {
@@ -610,40 +549,68 @@
 
         function renderAdminPending() {
             const list = document.getElementById('admin-pending-list');
+            const borrowed = borrowRecords.filter(r => r.status === 'borrowed');
             const pending = borrowRecords.filter(r => r.status === 'pending');
 
-            if (pending.length === 0) {
-                list.innerHTML = `
-                    <div class="text-center py-12 bg-white rounded-2xl">
-                        <div class="text-6xl mb-4">✅</div>
-                        <p class="text-gray-500">ไม่มีรายการรอการอนุมัติ</p>
-                    </div>
-                `;
-                return;
-            }
+            let html = '';
 
-            list.innerHTML = pending.map(record => `
-                <div class="bg-white rounded-xl p-4 shadow-md">
-                    <div class="flex items-start justify-between mb-3">
-                        <div class="flex items-center gap-3">
-                            <div class="text-3xl">${record.equipmentIcon}</div>
-                            <div>
-                                <h4 class="font-semibold text-gray-800">${record.equipmentName} x${record.quantity}</h4>
-                                <p class="text-sm text-gray-600">${record.studentName} (${record.studentId})</p>
-                                <p class="text-xs text-gray-500">คืนเมื่อ: ${formatDateTime(record.actualReturnDate)}</p>
+            if (borrowed.length > 0) {
+                html += '<div class="mb-8"><h3 class="text-lg font-bold text-gray-800 mb-4">📦 รายการที่มีคนยืมอยู่</h3>';
+                html += borrowed.map(record => `
+                    <div class="bg-blue-50 rounded-xl p-4 shadow-md mb-3 border-l-4 border-blue-500">
+                        <div class="flex items-start justify-between">
+                            <div class="flex items-center gap-3">
+                                <div class="text-4xl">${record.equipmentIcon}</div>
+                                <div>
+                                    <h4 class="font-semibold text-gray-800">${record.equipmentName} x${record.quantity}</h4>
+                                    <p class="text-sm text-gray-600">👤 ${record.studentName} (${record.studentId})</p>
+                                    <p class="text-xs text-gray-500">📅 ยืมเมื่อ: ${formatDateTime(record.borrowDate)}</p>
+                                    <p class="text-xs text-gray-500">📅 กำหนดคืน: ${formatDate(record.returnDate)}</p>
+                                </div>
                             </div>
                         </div>
                     </div>
-                    ${record.returnPhoto ? `
-                        <button onclick="showImage('${record.returnPhoto.replace(/'/g, "\\'")}')" class="mb-3 text-sm text-blue-600 hover:underline flex items-center gap-1">
-                            📷 ดูรูปหลักฐาน
+                `).join('');
+                html += '</div>';
+            }
+
+            if (pending.length > 0) {
+                html += '<div><h3 class="text-lg font-bold text-gray-800 mb-4">⏳ รายการรอการอนุมัติการคืน</h3>';
+                html += pending.map(record => `
+                    <div class="bg-yellow-50 rounded-xl p-4 shadow-md mb-3 border-l-4 border-yellow-500">
+                        <div class="flex items-start justify-between mb-3">
+                            <div class="flex items-center gap-3">
+                                <div class="text-4xl">${record.equipmentIcon}</div>
+                                <div>
+                                    <h4 class="font-semibold text-gray-800">${record.equipmentName} x${record.quantity}</h4>
+                                    <p class="text-sm text-gray-600">👤 ${record.studentName} (${record.studentId})</p>
+                                    <p class="text-xs text-gray-500">📅 คืนเมื่อ: ${formatDateTime(record.actualReturnDate)}</p>
+                                </div>
+                            </div>
+                        </div>
+                        ${record.returnPhoto ? `
+                            <button onclick="showImage('${record.returnPhoto.replace(/'/g, "\\'")}')" class="mb-3 w-full text-sm text-blue-600 hover:text-blue-800 font-medium py-2 bg-white border border-blue-300 rounded-lg transition-colors">
+                                📷 ดูรูปหลักฐาน
+                            </button>
+                        ` : ''}
+                        <button onclick="approveReturn('${record.id}')" class="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium transition-colors">
+                            ✅ อนุมัติการคืน
                         </button>
-                    ` : ''}
-                    <button onclick="approveReturn('${record.id}')" class="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium transition-colors">
-                        ✅ อนุมัติการคืน
-                    </button>
-                </div>
-            `).join('');
+                    </div>
+                `).join('');
+                html += '</div>';
+            }
+
+            if (borrowed.length === 0 && pending.length === 0) {
+                html = `
+                    <div class="text-center py-12 bg-white rounded-2xl">
+                        <div class="text-6xl mb-4">✅</div>
+                        <p class="text-gray-500">ไม่มีรายการที่ต้องตรวจสอบ</p>
+                    </div>
+                `;
+            }
+
+            list.innerHTML = html;
         }
 
         function approveReturn(borrowId) {
@@ -655,80 +622,12 @@
             record.status = 'approved';
             equipment.available += record.quantity;
 
-            if (isFirebaseInitialized && db) {
-                try {
-                    db.collection('borrowRecords').doc(borrowId).update({
-                        status: 'approved'
-                    });
-                } catch (error) {
-                    console.error("Firebase update error:", error);
-                }
-            }
-
             updateAdminDashboard();
             renderAdminPending();
             showToast('อนุมัติการคืนสำเร็จ!', 'success');
         }
 
-        function renderAdminEquipment() {
-            const list = document.getElementById('admin-equipment-list');
-            list.innerHTML = equipmentData.map(eq => `
-                <div class="bg-white rounded-xl p-4 shadow-md">
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center gap-4">
-                            <div class="text-5xl">${eq.icon}</div>
-                            <div>
-                                <h4 class="font-semibold text-gray-800">${eq.name}</h4>
-                                <p class="text-sm text-gray-600">มีอยู่: ${eq.available}/${eq.total} ชิ้น</p>
-                            </div>
-                        </div>
-                        <div class="flex gap-2">
-                            <button onclick="editEquipment('${eq.id}')" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium">
-                                ✏️ แก้ไข
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        function editEquipment(equipmentId) {
-            showToast('ฟีเจอร์นี้อยู่ระหว่างพัฒนา', 'info');
-        }
-
-        function openEquipmentModal() {
-            showToast('ฟีเจอร์นี้อยู่ระหว่างพัฒนา', 'info');
-        }
-
         // ===== COMMON FUNCTIONS =====
-        async function loadBorrowRecords() {
-            if (!isFirebaseInitialized) return;
-
-            try {
-                const snapshot = await db.collection('borrowRecords').get();
-                borrowRecords = [];
-                
-                snapshot.forEach(doc => {
-                    const data = doc.data();
-                    data.id = doc.id;
-                    borrowRecords.push(data);
-
-                    if (data.status === 'borrowed' || data.status === 'pending') {
-                        const eq = equipmentData.find(e => e.id === data.equipmentId);
-                        if (eq) {
-                            eq.available -= data.quantity;
-                        }
-                    }
-                });
-
-                if (currentUserRole === 'admin') {
-                    updateAdminDashboard();
-                }
-            } catch (error) {
-                console.error("Error loading records:", error);
-            }
-        }
-
         function showImage(url) {
             document.getElementById('preview-image').src = url;
             document.getElementById('image-modal').classList.remove('hidden');
@@ -757,7 +656,7 @@
             const classes = {
                 borrowed: 'status-borrowed',
                 pending: 'status-pending',
-                approved: 'status-approved',
+                approved: 'status-returned',
                 returned: 'status-returned'
             };
             return classes[status] || 'bg-gray-100 text-gray-700';
@@ -796,5 +695,5 @@
         // Initialize
         setUserRole('student');
     </script>
- <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9cd2e0b6020ba192',t:'MTc3MDk3MDUyNS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9cd2ef07607a9cf3',t:'MTc3MDk3MTExMS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
