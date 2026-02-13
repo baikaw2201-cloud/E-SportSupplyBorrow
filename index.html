@@ -1,4 +1,4 @@
-<!doctype html>
+         <!doctype html>
 <html lang="th" class="h-full">
  <head>
   <meta charset="UTF-8">
@@ -10,6 +10,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/compressorjs@1.10.1/dist/compressor.min.js"></script>
   <style>
         * { font-family: 'Prompt', sans-serif; }
         .tab-active { background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; }
@@ -30,6 +31,10 @@
         @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
         .loading { display: inline-block; animation: spin 1s linear infinite; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .compression-info { font-size: 0.75rem; color: #6b7280; }
+        .progress-bar { width: 100%; height: 4px; background: #e5e7eb; border-radius: 99px; overflow: hidden; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, #3b82f6, #1d4ed8); animation: slideRight 0.3s ease; }
+        @keyframes slideRight { from { width: 0%; } to { width: 100%; } }
     </style>
   <style>body { box-sizing: border-box; }</style>
   <script src="/_sdk/data_sdk.js" type="text/javascript"></script>
@@ -130,7 +135,7 @@
       </div>
      </form>
     </div>
-   </div><!-- Return Modal -->
+   </div><!-- Return Modal with Compression Info -->
    <div id="return-modal" class="fixed inset-0 z-50 hidden">
     <div class="modal-backdrop absolute inset-0" onclick="closeReturnModal()"></div>
     <div class="absolute inset-4 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-full md:max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden">
@@ -142,12 +147,21 @@
       <div><label class="block text-sm font-medium text-gray-700 mb-2">ถ่ายรูปหลักฐานการคืน</label>
        <div class="border-2 border-dashed border-gray-300 rounded-xl p-4 text-center hover:border-blue-500 transition-all cursor-pointer" onclick="document.getElementById('return-photo').click()"><input type="file" id="return-photo" accept="image/*" capture="environment" class="hidden" onchange="previewReturnPhoto(event)">
         <div id="photo-preview" class="hidden"><img id="preview-img" class="max-h-48 mx-auto rounded-lg">
+         <div class="mt-2 compression-info">
+          <div class="flex justify-between text-xs mb-2"><span>กำลังบีบอัด...</span> <span id="compression-percent">0%</span>
+          </div>
+          <div class="progress-bar">
+           <div class="progress-fill" id="progress-fill" style="width: 0%"></div>
+          </div>
+          <p id="compression-info-text" class="mt-2"></p>
+         </div>
         </div>
         <div id="photo-placeholder">
          <div class="text-4xl mb-2">
           📷
          </div>
          <p class="text-gray-500">คลิกเพื่อถ่ายรูปหรือเลือกรูป</p>
+         <p class="text-xs text-gray-400 mt-2">จะถูกบีบอัดโดยอัตโนมัติ</p>
         </div>
        </div>
       </div>
@@ -198,6 +212,19 @@
             console.error("Firebase initialization error:", error);
         }
 
+        // ==================== COMPRESSION SETTINGS ====================
+        const compressionSettings = {
+            maxWidth: 1920,
+            maxHeight: 1080,
+            quality: 0.8,
+            mimeType: 'image/jpeg',
+            maxFileSize: 500 * 1024 // 500KB max
+        };
+
+        let compressedImageFile = null;
+        let originalImageSize = 0;
+        let compressedImageSize = 0;
+
         // ==================== APP STATE ====================
         let isAdmin = false;
         let currentFilter = 'all';
@@ -218,7 +245,7 @@
         // ==================== ELEMENT SDK ====================
         const defaultConfig = {
             site_title: 'ระบบยืม-คืนอุปกรณ์กีฬา',
-            school_name: 'โรงเรียนของคุณ'
+            school_name: 'โรงเรียนสามร้อยยอดวิทยาคม'
         };
 
         if (window.elementSdk) {
@@ -238,6 +265,61 @@
                     ['site_title', config.site_title || defaultConfig.site_title],
                     ['school_name', config.school_name || defaultConfig.school_name]
                 ])
+            });
+        }
+
+        // ==================== IMAGE COMPRESSION FUNCTION ====================
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+        }
+
+        function compressImage(file) {
+            return new Promise((resolve, reject) => {
+                originalImageSize = file.size;
+                document.getElementById('compression-info-text').innerHTML = `
+                    📁 ขนาดเดิม: ${formatFileSize(originalImageSize)}<br/>
+                    ⏳ กำลังบีบอัด...
+                `;
+
+                new Compressor(file, {
+                    quality: compressionSettings.quality,
+                    maxWidth: compressionSettings.maxWidth,
+                    maxHeight: compressionSettings.maxHeight,
+                    mimeType: compressionSettings.mimeType,
+                    convertSize: compressionSettings.maxFileSize,
+                    // Progress callback
+                    progress: (progress) => {
+                        const percent = Math.round(progress * 100);
+                        document.getElementById('compression-percent').textContent = percent + '%';
+                        document.getElementById('progress-fill').style.width = percent + '%';
+                    },
+                    // Success callback
+                    success(result) {
+                        compressedImageSize = result.size;
+                        const ratio = Math.round((1 - compressedImageSize / originalImageSize) * 100);
+                        
+                        document.getElementById('compression-info-text').innerHTML = `
+                            📁 ขนาดเดิม: ${formatFileSize(originalImageSize)}<br/>
+                            ✅ ขนาดหลังบีบอัด: ${formatFileSize(compressedImageSize)}<br/>
+                            📉 ลดขนาดลง: ${ratio}%
+                        `;
+                        document.getElementById('compression-percent').textContent = '✓';
+                        
+                        resolve(result);
+                    },
+                    error(err) {
+                        console.error('Compression error:', err);
+                        document.getElementById('compression-info-text').innerHTML = `
+                            ⚠️ เกิดข้อผิดพลาดในการบีบอัด<br/>
+                            ใช้รูปภาพต้นฉบับแทน
+                        `;
+                        reject(err);
+                    }
+                });
             });
         }
 
@@ -431,6 +513,10 @@
             document.getElementById('photo-preview').classList.add('hidden');
             document.getElementById('photo-placeholder').classList.remove('hidden');
             document.getElementById('return-photo').value = '';
+            document.getElementById('compression-info-text').innerHTML = '';
+            document.getElementById('compression-percent').textContent = '0%';
+            document.getElementById('progress-fill').style.width = '0%';
+            compressedImageFile = null;
             document.getElementById('return-modal').classList.remove('hidden');
         }
 
@@ -439,16 +525,24 @@
             document.getElementById('return-form').reset();
         }
 
-        function previewReturnPhoto(event) {
+        async function previewReturnPhoto(event) {
             const file = event.target.files[0];
             if (file) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    document.getElementById('preview-img').src = e.target.result;
+                try {
+                    document.getElementById('preview-img').src = URL.createObjectURL(file);
+                    
+                    // Compress the image
+                    const compressed = await compressImage(file);
+                    compressedImageFile = compressed;
+                    
                     document.getElementById('photo-preview').classList.remove('hidden');
                     document.getElementById('photo-placeholder').classList.add('hidden');
-                };
-                reader.readAsDataURL(file);
+                } catch (error) {
+                    console.error('Error during compression:', error);
+                    // Fallback to original file
+                    compressedImageFile = file;
+                    showToast('⚠️ ใช้รูปต้นฉบับแทน', 'error');
+                }
             }
         }
 
@@ -498,10 +592,9 @@
         document.getElementById('return-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const btn = document.getElementById('submit-return-btn');
-            const file = document.getElementById('return-photo').files[0];
             const borrowId = document.getElementById('return-borrow-id').value;
 
-            if (!file) {
+            if (!compressedImageFile) {
                 showToast('❌ กรุณาถ่ายรูปหลักฐาน', 'error');
                 return;
             }
@@ -510,16 +603,21 @@
             btn.textContent = '⏳ กำลังอัปโหลด...';
 
             try {
-                // Upload image to Firebase Storage
+                // Upload compressed image to Firebase Storage
                 const storageRef = storage.ref(`returns/${borrowId}_${Date.now()}`);
-                const snapshot = await storageRef.put(file);
+                const snapshot = await storageRef.put(compressedImageFile);
                 const downloadUrl = await snapshot.ref.getDownloadURL();
 
                 // Update borrow record
                 await db.collection('borrows').doc(borrowId).update({
                     status: 'pending',
                     returnPhotoUrl: downloadUrl,
-                    returnRequestDate: new Date().toISOString()
+                    returnRequestDate: new Date().toISOString(),
+                    imageSize: {
+                        original: originalImageSize,
+                        compressed: compressedImageSize,
+                        ratio: Math.round((1 - compressedImageSize / originalImageSize) * 100)
+                    }
                 });
 
                 showToast('✅ ส่งคำขอคืนสำเร็จ! รอแอดมินอนุมัติ');
@@ -640,5 +738,5 @@
         // ==================== INITIALIZATION ====================
         renderEquipmentGrid();
     </script>
- <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9cd143e0a0f5a18a',t:'MTc3MDk1MzYxNS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9cd1f49f4564a18a',t:'MTc3MDk2MDg1NS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
