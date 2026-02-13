@@ -785,6 +785,68 @@
 
         // ==================== INITIALIZATION ====================
         renderEquipmentGrid();
+        // ฟังก์ชันจัดการการส่งคืนอุปกรณ์ (Submit Return)
+document.getElementById('return-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const borrowId = document.getElementById('return-borrow-id').value;
+    const submitBtn = document.getElementById('submit-return-btn');
+
+    if (!compressedImageFile) {
+        showToast('กรุณาถ่ายรูปหรือเลือกรูปหลักฐานการคืนก่อนครับ', 'error');
+        return;
+    }
+
+    try {
+        // 1. เปลี่ยนสถานะปุ่มเป็นกำลังโหลด
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="loading">⏳</span> กำลังอัปโหลด...';
+
+        // 2. อัปโหลดรูปภาพไปยัง Firebase Storage
+        const fileName = `returns/${borrowId}_${Date.now()}.jpg`;
+        const storageRef = storage.ref().child(fileName);
+        const uploadTask = await storageRef.put(compressedImageFile);
+        const photoUrl = await uploadTask.ref.getDownloadURL();
+
+        // 3. อัปเดตข้อมูลใน Firestore
+        await db.collection('borrows').doc(borrowId).update({
+            status: 'pending', // เปลี่ยนสถานะเป็นรออนุมัติ
+            returnPhotoUrl: photoUrl,
+            returnSubmittedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        // 4. แจ้งเตือนและปิด Modal
+        showToast('ส่งหลักฐานการคืนเรียบร้อย! รอแอดมินอนุมัติครับ');
+        closeReturnModal();
+        
+        // รีเฟรชรายการที่นักเรียนยืมอยู่ (ถ้ามีการค้นหาไว้)
+        const studentId = document.getElementById('search-student-id').value;
+        if (studentId) renderStudentBorrows(studentId);
+
+    } catch (error) {
+        console.error("Error submitting return:", error);
+        showToast('เกิดข้อผิดพลาด: ' + error.message, 'error');
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '✅ ยืนยันการคืน';
+    }
+});
+
+// ฟังก์ชันสำหรับแอดมินอนุมัติการคืน (Approve)
+async function approveReturn(borrowId) {
+    if (!confirm('ยืนยันการอนุมัติการคืนอุปกรณ์นี้ใช่หรือไม่?')) return;
+
+    try {
+        await db.collection('borrows').doc(borrowId).update({
+            status: 'returned',
+            approvedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        showToast('อนุมัติการคืนเรียบร้อย');
+        renderAllBorrows(); // รีเฟรชรายการแอดมิน
+    } catch (error) {
+        showToast('ไม่สามารถอนุมัติได้: ' + error.message, 'error');
+    }
+}
     </script>
  <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9cd20613f023a193',t:'MTc3MDk2MTU3MC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
