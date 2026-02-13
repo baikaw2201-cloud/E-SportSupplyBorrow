@@ -1,288 +1,725 @@
 <!doctype html>
 <html lang="th" class="h-full">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ระบบยืม-คืนอุปกรณ์กีฬา | Sports System</title>
-    <script src="https://cdn.tailwindcss.com/3.4.17"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/compressorjs@1.10.1/dist/compressor.min.js"></script>
-
-    <style>
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ระบบยืม-คืนอุปกรณ์กีฬา</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="/_sdk/element_sdk.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet">
+  <style>
         * { font-family: 'Prompt', sans-serif; }
-        .gradient-bg { background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); }
-        .tab-active { background: #3b82f6; color: white; transform: scale(1.02); }
-        .loading-spinner { border: 3px solid #f3f3f3; border-top: 3px solid #3498db; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; display: inline-block; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .modal-backdrop { background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); }
+        .tab-active { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; }
+        .card-hover:hover { transform: translateY(-4px); box-shadow: 0 12px 24px rgba(0,0,0,0.15); }
+        .btn-primary { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
+        .btn-primary:hover { background: linear-gradient(135deg, #059669 0%, #047857 100%); }
+        .modal-overlay { background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); }
+        .status-pending { background: #fef3c7; color: #92400e; }
+        .status-borrowed { background: #dbeafe; color: #1e40af; }
+        .status-returned { background: #d1fae5; color: #065f46; }
+        .status-approved { background: #dcfce7; color: #166534; }
+        .equipment-card { transition: all 0.3s ease; }
+        .quantity-badge { position: absolute; top: -8px; right: -8px; }
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        .animate-fadeIn { animation: fadeIn 0.3s ease-out; }
+        .toast { animation: slideIn 0.3s ease-out; }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
     </style>
-</head>
-<body class="h-full bg-gray-50 text-gray-800">
-
-<div id="app" class="h-full flex flex-col">
-    <header class="gradient-bg text-white shadow-lg p-5">
-        <div class="max-w-7xl mx-auto flex justify-between items-center">
-            <div class="flex items-center gap-3">
-                <div class="p-2 bg-white/20 rounded-lg text-2xl">⚽</div>
-                <h1 class="text-xl font-bold">ระบบยืม-คืนอุปกรณ์กีฬา</h1>
-            </div>
-            <button onclick="toggleAdmin()" class="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm border border-white/30 transition-all">🔐 แอดมิน</button>
-        </div>
-    </header>
-
-    <nav class="bg-white border-b sticky top-0 z-30">
-        <div class="max-w-7xl mx-auto px-4 py-3 flex gap-2 overflow-x-auto">
-            <button class="tab-btn tab-active px-6 py-2.5 rounded-xl font-semibold transition-all shadow-sm" data-tab="borrow" onclick="switchTab('borrow')">📦 ยืมอุปกรณ์</button>
-            <button class="tab-btn bg-gray-100 px-6 py-2.5 rounded-xl font-semibold transition-all text-gray-500" data-tab="return" onclick="switchTab('return')">🔄 คืนอุปกรณ์</button>
-            <button id="admin-tab" class="tab-btn hidden bg-purple-100 text-purple-700 px-6 py-2.5 rounded-xl font-semibold transition-all" data-tab="admin" onclick="switchTab('admin')">👨‍💼 จัดการระบบ</button>
-        </div>
-    </nav>
-
-    <main class="flex-1 max-w-7xl mx-auto px-4 py-6 w-full">
-        <section id="borrow-section" class="tab-content">
-            <div id="equipment-grid" class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                </div>
-        </section>
-
-        <section id="return-section" class="tab-content hidden">
-            <div class="max-w-md mx-auto bg-white p-6 rounded-2xl shadow-sm border mb-6 text-center">
-                <h2 class="text-lg font-bold mb-4">ค้นหาเพื่อคืนอุปกรณ์</h2>
-                <div class="flex gap-2">
-                    <input type="text" id="search-input" placeholder="กรอกรหัสนักเรียน..." class="flex-1 px-4 py-3 bg-gray-50 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none">
-                    <button onclick="searchMyBorrows()" class="bg-blue-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-blue-700 transition-all">ค้นหา</button>
-                </div>
-            </div>
-            <div id="student-list" class="space-y-3"></div>
-        </section>
-
-        <section id="admin-section" class="tab-content hidden">
-            <h2 class="text-xl font-bold mb-4">รายการรออนุมัติคืน</h2>
-            <div id="admin-list" class="space-y-3"></div>
-        </section>
-    </main>
-</div>
-
-<div id="borrow-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
-    <div class="modal-backdrop absolute inset-0" onclick="closeModal('borrow-modal')"></div>
-    <div class="bg-white rounded-3xl w-full max-w-md relative overflow-hidden">
-        <div class="gradient-bg p-6 text-white text-center">
-            <h3 class="text-xl font-bold" id="modal-title">ยืมอุปกรณ์</h3>
-        </div>
-        <form id="borrow-form" class="p-6 space-y-4">
-            <input type="hidden" id="modal-eq-id">
-            <input type="text" id="std-name" placeholder="ชื่อ-นามสกุล" required class="w-full px-4 py-3 bg-gray-50 border rounded-xl outline-none focus:border-blue-500">
-            <input type="text" id="std-id" placeholder="รหัสนักเรียน" required class="w-full px-4 py-3 bg-gray-50 border rounded-xl outline-none focus:border-blue-500">
-            <div class="flex gap-2 pt-2">
-                <button type="button" onclick="closeModal('borrow-modal')" class="flex-1 py-3 bg-gray-100 rounded-xl font-bold">ยกเลิก</button>
-                <button type="submit" class="flex-1 py-3 bg-blue-600 text-white rounded-xl font-bold">ยืนยันการยืม</button>
-            </div>
-        </form>
+  <style>body { box-sizing: border-box; }</style>
+  <script src="/_sdk/data_sdk.js" type="text/javascript"></script>
+ </head>
+ <body class="h-full bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50">
+  <div id="app" class="h-full overflow-auto"><!-- Header -->
+   <header class="bg-white shadow-lg sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 py-4">
+     <div class="flex items-center justify-between">
+      <div class="flex items-center gap-3">
+       <div class="w-12 h-12 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center shadow-lg"><span class="text-2xl">🏀</span>
+       </div>
+       <div>
+        <h1 id="site-title" class="text-xl font-bold text-gray-800">ระบบยืม-คืนอุปกรณ์กีฬา</h1>
+        <p id="school-name" class="text-sm text-gray-500">โรงเรียนของคุณ</p>
+       </div>
+      </div><button onclick="toggleAdminPanel()" class="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"> <span>👤</span> <span class="hidden sm:inline text-sm font-medium">แอดมิน</span> </button>
+     </div>
     </div>
-</div>
-
-<div id="return-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
-    <div class="modal-backdrop absolute inset-0" onclick="closeModal('return-modal')"></div>
-    <div class="bg-white rounded-3xl w-full max-w-md relative overflow-hidden">
-        <div class="bg-purple-600 p-6 text-white text-center">
-            <h3 class="text-xl font-bold">📸 ถ่ายรูปหลักฐานการคืน</h3>
-        </div>
-        <form id="return-form" class="p-6 space-y-4">
-            <input type="hidden" id="return-doc-id">
-            <div class="border-2 border-dashed border-gray-300 rounded-2xl p-4 text-center cursor-pointer hover:bg-gray-50" onclick="document.getElementById('file-input').click()">
-                <input type="file" id="file-input" accept="image/*" capture="environment" class="hidden" onchange="previewImage(event)">
-                <div id="preview-container" class="hidden">
-                    <img id="img-show" class="max-h-48 mx-auto rounded-lg mb-2">
-                    <p class="text-green-600 text-sm font-bold">✓ รูปภาพพร้อมส่ง</p>
-                </div>
-                <div id="placeholder">
-                    <p class="text-4xl mb-2">📷</p>
-                    <p class="text-gray-500 font-medium">กดเพื่อเปิดกล้องหรือเลือกรูป</p>
-                </div>
-            </div>
-            <button type="submit" id="submit-return-btn" class="w-full py-4 bg-purple-600 text-white rounded-2xl font-bold shadow-lg">🚀 ส่งหลักฐานการคืน</button>
-        </form>
+   </header><!-- Navigation Tabs -->
+   <nav class="bg-white border-b sticky top-20 z-30">
+    <div class="max-w-7xl mx-auto px-4">
+     <div class="flex gap-2 py-3 overflow-x-auto"><button onclick="switchTab('borrow')" id="tab-borrow" class="tab-active px-6 py-2.5 rounded-full font-medium transition-all whitespace-nowrap"> 📦 ยืมอุปกรณ์ </button> <button onclick="switchTab('return')" id="tab-return" class="px-6 py-2.5 rounded-full font-medium bg-gray-100 hover:bg-gray-200 transition-all whitespace-nowrap"> 🔄 คืนอุปกรณ์ </button> <button onclick="switchTab('history')" id="tab-history" class="px-6 py-2.5 rounded-full font-medium bg-gray-100 hover:bg-gray-200 transition-all whitespace-nowrap"> 📋 ประวัติของฉัน </button>
+     </div>
     </div>
-</div>
-
-<script>
-    // 1. Firebase Configuration (เปลี่ยนเป็นข้อมูลโปรเจกต์ของคุณ)
-    const firebaseConfig = {
-        apiKey: "AIzaSy...",
-        authDomain: "your-project.firebaseapp.com",
-        projectId: "your-project",
-        storageBucket: "your-project.firebasestorage.app",
-        appId: "your-app-id"
-    };
-
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
-    const storage = firebase.storage();
-
-    // 2. ข้อมูลอุปกรณ์
-    const items = [
-        { id: 'ball1', name: 'ฟุตบอล', icon: '⚽' },
-        { id: 'ball2', name: 'บาสเกตบอล', icon: '🏀' },
-        { id: 'ball3', name: 'วอลเลย์บอล', icon: '🏐' },
-        { id: 'ball4', name: 'แบดมินตัน', icon: '🏸' }
-    ];
-
-    let compressedFile = null;
-
-    // 3. เริ่มต้นระบบ
-    function init() {
-        const grid = document.getElementById('equipment-grid');
-        grid.innerHTML = items.map(item => `
-            <div onclick="openBorrow('${item.id}', '${item.name}')" class="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm text-center cursor-pointer hover:shadow-md transition-all">
-                <div class="text-5xl mb-3">${item.icon}</div>
-                <h3 class="font-bold">${item.name}</h3>
-                <p class="text-blue-500 text-sm mt-1">คลิกเพื่อยืม</p>
-            </div>
-        `).join('');
-    }
-
-    // 4. ระบบยืม
-    function openBorrow(id, name) {
-        document.getElementById('modal-eq-id').value = id;
-        document.getElementById('modal-title').innerText = 'ยืม' + name;
-        document.getElementById('borrow-modal').classList.remove('hidden');
-    }
-
-    document.getElementById('borrow-form').onsubmit = async (e) => {
-        e.preventDefault();
-        const data = {
-            equipmentId: document.getElementById('modal-eq-id').value,
-            studentName: document.getElementById('std-name').value,
-            studentId: document.getElementById('std-id').value,
-            status: 'borrowed',
-            borrowDate: new Date()
+   </nav><!-- Main Content -->
+   <main class="max-w-7xl mx-auto px-4 py-6"><!-- Borrow Tab -->
+    <section id="content-borrow" class="space-y-6">
+     <div class="text-center mb-8">
+      <h2 class="text-2xl font-bold text-gray-800 mb-2">เลือกอุปกรณ์กีฬาที่ต้องการยืม</h2>
+      <p class="text-gray-500">คลิกที่อุปกรณ์เพื่อทำการยืม</p>
+     </div>
+     <div id="equipment-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4"><!-- Equipment cards will be rendered here -->
+     </div>
+    </section><!-- Return Tab -->
+    <section id="content-return" class="hidden space-y-6">
+     <div class="text-center mb-8">
+      <h2 class="text-2xl font-bold text-gray-800 mb-2">คืนอุปกรณ์กีฬา</h2>
+      <p class="text-gray-500">เลือกรายการที่ต้องการคืนและถ่ายรูปเป็นหลักฐาน</p>
+     </div>
+     <div id="return-list" class="space-y-4"><!-- Return items will be rendered here -->
+     </div>
+    </section><!-- History Tab -->
+    <section id="content-history" class="hidden space-y-6">
+     <div class="text-center mb-8">
+      <h2 class="text-2xl font-bold text-gray-800 mb-2">ประวัติการยืม-คืน</h2>
+      <p class="text-gray-500">ดูประวัติการยืมและคืนอุปกรณ์ของคุณ</p>
+     </div>
+     <div class="mb-4"><input type="text" id="history-search" placeholder="ค้นหาด้วยรหัสนักเรียน..." class="w-full max-w-md px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent" oninput="filterHistory()">
+     </div>
+     <div id="history-list" class="space-y-4"><!-- History items will be rendered here -->
+     </div>
+    </section>
+   </main><!-- Borrow Modal -->
+   <div id="borrow-modal" class="fixed inset-0 z-50 hidden">
+    <div class="modal-overlay absolute inset-0" onclick="closeBorrowModal()"></div>
+    <div class="absolute inset-4 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-full sm:max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden animate-fadeIn">
+     <div class="bg-gradient-to-r from-emerald-500 to-teal-600 px-6 py-4">
+      <h3 class="text-xl font-bold text-white">ยืมอุปกรณ์</h3>
+      <p id="modal-equipment-name" class="text-emerald-100 text-sm"></p>
+     </div>
+     <form id="borrow-form" class="p-6 space-y-4" onsubmit="submitBorrow(event)"><input type="hidden" id="selected-equipment-id">
+      <div><label class="block text-sm font-medium text-gray-700 mb-1">ชื่อนักเรียน *</label> <input type="text" id="student-name" required class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent" placeholder="กรอกชื่อ-นามสกุล">
+      </div>
+      <div><label class="block text-sm font-medium text-gray-700 mb-1">รหัสนักเรียน *</label> <input type="text" id="student-id" required class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent" placeholder="กรอกรหัสนักเรียน">
+      </div>
+      <div><label class="block text-sm font-medium text-gray-700 mb-1">จำนวนที่ต้องการยืม *</label>
+       <div class="flex items-center gap-3"><button type="button" onclick="adjustQuantity(-1)" class="w-10 h-10 bg-gray-100 hover:bg-gray-200 rounded-full text-xl font-bold">-</button> <input type="number" id="borrow-quantity" value="1" min="1" required readonly class="w-20 px-4 py-3 border border-gray-200 rounded-xl text-center font-bold"> <button type="button" onclick="adjustQuantity(1)" class="w-10 h-10 bg-gray-100 hover:bg-gray-200 rounded-full text-xl font-bold">+</button> <span id="available-count" class="text-sm text-gray-500"></span>
+       </div>
+      </div>
+      <div><label class="block text-sm font-medium text-gray-700 mb-1">วันที่จะนำมาคืน *</label> <input type="date" id="return-date" required class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+      </div>
+      <div class="flex gap-3 pt-4"><button type="button" onclick="closeBorrowModal()" class="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 rounded-xl font-medium transition-colors"> ยกเลิก </button> <button type="submit" id="submit-borrow-btn" class="flex-1 px-4 py-3 btn-primary text-white rounded-xl font-medium transition-colors"> ยืนยันการยืม </button>
+      </div>
+     </form>
+    </div>
+   </div><!-- Return Modal -->
+   <div id="return-modal" class="fixed inset-0 z-50 hidden">
+    <div class="modal-overlay absolute inset-0" onclick="closeReturnModal()"></div>
+    <div class="absolute inset-4 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-full sm:max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden animate-fadeIn">
+     <div class="bg-gradient-to-r from-blue-500 to-indigo-600 px-6 py-4">
+      <h3 class="text-xl font-bold text-white">คืนอุปกรณ์</h3>
+      <p id="return-modal-info" class="text-blue-100 text-sm"></p>
+     </div>
+     <form id="return-form" class="p-6 space-y-4"><input type="hidden" id="return-borrow-id">
+      <div><label class="block text-sm font-medium text-gray-700 mb-2">ถ่ายรูปอุปกรณ์เป็นหลักฐาน *</label>
+       <div class="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-emerald-500 transition-colors"><input type="file" id="return-photo" accept="image/*" capture="environment" required class="hidden" onchange="previewReturnPhoto(event)">
+        <div id="photo-preview-container" class="hidden mb-4"><img id="photo-preview" class="max-h-48 mx-auto rounded-lg">
+        </div><button type="button" onclick="document.getElementById('return-photo').click()" class="px-6 py-3 bg-gray-100 hover:bg-gray-200 rounded-xl font-medium transition-colors"> 📷 <span id="photo-btn-text">เลือกรูปภาพ</span> </button>
+       </div>
+      </div>
+      <div class="flex gap-3 pt-4"><button type="button" onclick="closeReturnModal()" class="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 rounded-xl font-medium transition-colors"> ยกเลิก </button> <button type="button" id="submit-return-btn" onclick="submitReturn()" class="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition-colors"> ยืนยันการคืน </button>
+      </div>
+     </form>
+    </div>
+   </div><!-- Admin Panel -->
+   <div id="admin-panel" class="fixed inset-0 z-50 hidden">
+    <div class="modal-overlay absolute inset-0" onclick="toggleAdminPanel()"></div>
+    <div class="absolute inset-0 sm:inset-4 sm:left-auto sm:w-full sm:max-w-2xl bg-white shadow-2xl overflow-hidden animate-fadeIn sm:rounded-2xl">
+     <div class="bg-gradient-to-r from-gray-800 to-gray-900 px-6 py-4 flex items-center justify-between">
+      <div>
+       <h3 class="text-xl font-bold text-white">แผงควบคุมแอดมิน</h3>
+       <p class="text-gray-400 text-sm">จัดการการยืม-คืนอุปกรณ์</p>
+      </div><button onclick="toggleAdminPanel()" class="w-10 h-10 bg-gray-700 hover:bg-gray-600 rounded-full text-white text-xl">×</button>
+     </div>
+     <div class="p-4 border-b bg-gray-50">
+      <div class="flex gap-2 flex-wrap"><button onclick="filterAdmin('all')" class="admin-filter px-4 py-2 bg-gray-800 text-white rounded-lg text-sm font-medium" data-filter="all"> ทั้งหมด </button> <button onclick="filterAdmin('borrowed')" class="admin-filter px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium" data-filter="borrowed"> กำลังยืม </button> <button onclick="filterAdmin('pending')" class="admin-filter px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium" data-filter="pending"> รออนุมัติ </button> <button onclick="filterAdmin('approved')" class="admin-filter px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium" data-filter="approved"> อนุมัติแล้ว </button>
+      </div>
+     </div>
+     <div id="admin-list" class="overflow-y-auto" style="height: calc(100% - 140px);"><!-- Admin list will be rendered here -->
+     </div>
+    </div>
+   </div><!-- Image Preview Modal -->
+   <div id="image-modal" class="fixed inset-0 z-[60] hidden">
+    <div class="modal-overlay absolute inset-0" onclick="closeImageModal()"></div>
+    <div class="absolute inset-4 flex items-center justify-center">
+     <div class="relative max-w-3xl max-h-full animate-fadeIn"><button onclick="closeImageModal()" class="absolute -top-12 right-0 w-10 h-10 bg-white rounded-full text-xl shadow-lg">×</button> <img id="preview-image" class="max-w-full max-h-[80vh] rounded-xl shadow-2xl">
+     </div>
+    </div>
+   </div><!-- Toast Container -->
+   <div id="toast-container" class="fixed top-24 right-4 z-[70] space-y-2"></div>
+  </div>
+  <script>
+        // Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyCCcPHPBC3GYPB2UZIrlfOOuf6nZh_giAk",
+            authDomain: "e-sportsupply-borrowing.firebaseapp.com",
+            databaseURL: "https://e-sportsupply-borrowing-default-rtdb.firebaseio.com",
+            projectId: "e-sportsupply-borrowing",
+            storageBucket: "e-sportsupply-borrowing.firebasestorage.app",
+            messagingSenderId: "572790206354",
+            appId: "1:572790206354:web:8fb3a3c220494554b8db4b",
+            measurementId: "G-NC0WZTT9R6"
         };
-        try {
-            await db.collection('borrows').add(data);
-            alert('บันทึกการยืมสำเร็จ!');
-            closeModal('borrow-modal');
-        } catch (err) { alert('ผิดพลาด: ' + err.message); }
-    };
 
-    // 5. ระบบคืน (อัปโหลดรูป)
-    async function searchMyBorrows() {
-        const sid = document.getElementById('search-input').value;
-        const snap = await db.collection('borrows').where('studentId', '==', sid).where('status', '==', 'borrowed').get();
-        const list = document.getElementById('student-list');
-        
-        if(snap.empty) { list.innerHTML = '<p class="text-center text-gray-400">ไม่พบรายการยืม</p>'; return; }
-
-        list.innerHTML = snap.docs.map(doc => {
-            const d = doc.data();
-            const item = items.find(i => i.id === d.equipmentId);
-            return `
-                <div class="bg-white p-4 rounded-xl border flex justify-between items-center">
-                    <div><p class="font-bold">${item.name}</p><p class="text-xs text-gray-500">ยืมเมื่อ: ${d.borrowDate.toDate().toLocaleDateString()}</p></div>
-                    <button onclick="openReturnModal('${doc.id}')" class="bg-purple-600 text-white px-5 py-2 rounded-lg font-bold">คืน</button>
-                </div>
-            `;
-        }).join('');
-    }
-
-    function openReturnModal(id) {
-        document.getElementById('return-doc-id').value = id;
-        document.getElementById('return-modal').classList.remove('hidden');
-    }
-
-    function previewImage(e) {
-        const file = e.target.files[0];
-        if (file) {
-            new Compressor(file, {
-                quality: 0.6,
-                success(res) {
-                    compressedFile = res;
-                    document.getElementById('img-show').src = URL.createObjectURL(res);
-                    document.getElementById('preview-container').classList.remove('hidden');
-                    document.getElementById('placeholder').classList.add('hidden');
-                }
-            });
-        }
-    }
-
-    document.getElementById('return-form').onsubmit = async (e) => {
-        e.preventDefault();
-        if(!compressedFile) return alert('กรุณาถ่ายรูปหลักฐาน');
-        
-        const btn = document.getElementById('submit-return-btn');
-        const id = document.getElementById('return-doc-id').value;
+        // Initialize Firebase
+        let db, storage;
+        let isFirebaseInitialized = false;
 
         try {
-            btn.disabled = true;
-            btn.innerHTML = '<span class="loading-spinner"></span> กำลังส่ง...';
-
-            // Upload Image to Firebase Storage
-            const ref = storage.ref(`returns/${id}_${Date.now()}.jpg`);
-            const task = await ref.put(compressedFile);
-            const photoUrl = await task.ref.getDownloadURL();
-
-            // Update Database
-            await db.collection('borrows').doc(id).update({
-                status: 'pending',
-                photoUrl: photoUrl,
-                returnDate: new Date()
-            });
-
-            alert('ส่งหลักฐานสำเร็จ! รอแอดมินอนุมัติ');
-            closeModal('return-modal');
-            searchMyBorrows();
-        } catch (err) { alert('เกิดข้อผิดพลาด: ' + err.message); }
-        finally { btn.disabled = false; btn.innerText = '🚀 ส่งหลักฐานการคืน'; }
-    };
-
-    // 6. ฟังก์ชันเสริม
-    function switchTab(tab) {
-        document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
-        document.getElementById(tab + '-section').classList.remove('hidden');
-        document.querySelectorAll('.tab-btn').forEach(b => {
-            b.classList.remove('tab-active', 'bg-blue-600', 'text-white');
-            b.classList.add('bg-gray-100', 'text-gray-500');
-        });
-        const active = document.querySelector(`[data-tab="${tab}"]`);
-        active.classList.add('tab-active');
-        active.classList.remove('bg-gray-100', 'text-gray-500');
-    }
-
-    function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
-
-    function toggleAdmin() {
-        const pw = prompt('รหัสผ่านแอดมิน:');
-        if(pw === '1234') {
-            document.getElementById('admin-tab').classList.remove('hidden');
-            switchTab('admin');
-            loadAdminData();
+            firebase.initializeApp(firebaseConfig);
+            db = firebase.firestore();
+            storage = firebase.storage();
+            isFirebaseInitialized = true;
+            console.log("Firebase initialized successfully!");
+        } catch (error) {
+            console.error("Firebase initialization error:", error);
         }
-    }
 
-    async function loadAdminData() {
-        const snap = await db.collection('borrows').where('status', '==', 'pending').get();
-        const list = document.getElementById('admin-list');
-        list.innerHTML = snap.docs.map(doc => {
-            const d = doc.data();
-            return `
-                <div class="bg-white p-4 rounded-xl border flex flex-col gap-3">
-                    <div class="flex justify-between">
-                        <p class="font-bold">${d.studentName} (${d.studentId})</p>
-                        <button onclick="window.open('${d.photoUrl}')" class="text-blue-600 text-sm font-bold underline">ดูรูปหลักฐาน</button>
+        // Default Config
+        const defaultConfig = {
+            site_title: "ระบบยืม-คืนอุปกรณ์กีฬา",
+            school_name: "โรงเรียนของคุณ"
+        };
+
+        // Equipment Data
+        const equipmentData = [
+            { id: "basketball", name: "ลูกบาสเกตบอล", icon: "🏀", total: 10, available: 10 },
+            { id: "football", name: "ลูกฟุตบอล", icon: "⚽", total: 15, available: 15 },
+            { id: "volleyball", name: "ลูกวอลเลย์บอล", icon: "🏐", total: 12, available: 12 },
+            { id: "badminton", name: "ไม้แบดมินตัน", icon: "🏸", total: 20, available: 20 },
+            { id: "tennis", name: "ไม้เทนนิส", icon: "🎾", total: 8, available: 8 },
+            { id: "tabletennis", name: "ไม้ปิงปอง", icon: "🏓", total: 16, available: 16 },
+            { id: "baseball", name: "ไม้เบสบอล", icon: "⚾", total: 6, available: 6 },
+            { id: "rugby", name: "ลูกรักบี้", icon: "🏈", total: 5, available: 5 },
+            { id: "frisbee", name: "จานร่อน", icon: "🥏", total: 10, available: 10 },
+            { id: "jumprope", name: "เชือกกระโดด", icon: "🪢", total: 25, available: 25 }
+        ];
+
+        let currentEquipment = [...equipmentData];
+        let borrowRecords = [];
+        let currentAdminFilter = 'all';
+        let selectedEquipment = null;
+
+        // Element SDK Integration
+        if (window.elementSdk) {
+            window.elementSdk.init({
+                defaultConfig,
+                onConfigChange: async (config) => {
+                    document.getElementById('site-title').textContent = config.site_title || defaultConfig.site_title;
+                    document.getElementById('school-name').textContent = config.school_name || defaultConfig.school_name;
+                },
+                mapToCapabilities: (config) => ({
+                    recolorables: [],
+                    borderables: [],
+                    fontEditable: undefined,
+                    fontSizeable: undefined
+                }),
+                mapToEditPanelValues: (config) => new Map([
+                    ["site_title", config.site_title || defaultConfig.site_title],
+                    ["school_name", config.school_name || defaultConfig.school_name]
+                ])
+            });
+        }
+
+        // Initialize App
+        async function initApp() {
+            renderEquipment();
+            await loadBorrowRecords();
+            setMinReturnDate();
+        }
+
+        // Set minimum return date to today
+        function setMinReturnDate() {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('return-date').min = today;
+        }
+
+        // Render Equipment Grid
+        function renderEquipment() {
+            const grid = document.getElementById('equipment-grid');
+            grid.innerHTML = currentEquipment.map(eq => `
+                <div class="equipment-card bg-white rounded-2xl p-4 shadow-md card-hover cursor-pointer relative ${eq.available === 0 ? 'opacity-50' : ''}"
+                     onclick="${eq.available > 0 ? `openBorrowModal('${eq.id}')` : 'showToast(\"อุปกรณ์หมด\", \"error\")'}">
+                    <div class="text-5xl mb-3 text-center">${eq.icon}</div>
+                    <h3 class="font-semibold text-gray-800 text-center text-sm mb-2">${eq.name}</h3>
+                    <div class="flex justify-center">
+                        <span class="px-3 py-1 ${eq.available > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'} rounded-full text-xs font-medium">
+                            คงเหลือ ${eq.available}/${eq.total}
+                        </span>
                     </div>
-                    <button onclick="approve('${doc.id}')" class="w-full py-2 bg-green-500 text-white rounded-lg font-bold">อนุมัติคืน</button>
+                    ${eq.available === 0 ? '<div class="absolute inset-0 bg-white/60 rounded-2xl flex items-center justify-center"><span class="text-red-600 font-bold">หมด</span></div>' : ''}
                 </div>
+            `).join('');
+        }
+
+        // Tab Navigation
+        function switchTab(tab) {
+            ['borrow', 'return', 'history'].forEach(t => {
+                document.getElementById(`tab-${t}`).classList.remove('tab-active');
+                document.getElementById(`tab-${t}`).classList.add('bg-gray-100');
+                document.getElementById(`content-${t}`).classList.add('hidden');
+            });
+            document.getElementById(`tab-${tab}`).classList.add('tab-active');
+            document.getElementById(`tab-${tab}`).classList.remove('bg-gray-100');
+            document.getElementById(`content-${tab}`).classList.remove('hidden');
+
+            if (tab === 'return') renderReturnList();
+            if (tab === 'history') renderHistory();
+        }
+
+        // Borrow Modal
+        function openBorrowModal(equipmentId) {
+            selectedEquipment = currentEquipment.find(e => e.id === equipmentId);
+            if (!selectedEquipment) return;
+
+            document.getElementById('selected-equipment-id').value = equipmentId;
+            document.getElementById('modal-equipment-name').textContent = `${selectedEquipment.icon} ${selectedEquipment.name}`;
+            document.getElementById('borrow-quantity').value = 1;
+            document.getElementById('borrow-quantity').max = selectedEquipment.available;
+            document.getElementById('available-count').textContent = `(คงเหลือ ${selectedEquipment.available} ชิ้น)`;
+            document.getElementById('borrow-modal').classList.remove('hidden');
+        }
+
+        function closeBorrowModal() {
+            document.getElementById('borrow-modal').classList.add('hidden');
+            document.getElementById('borrow-form').reset();
+        }
+
+        function adjustQuantity(delta) {
+            const input = document.getElementById('borrow-quantity');
+            const newVal = parseInt(input.value) + delta;
+            if (newVal >= 1 && newVal <= selectedEquipment.available) {
+                input.value = newVal;
+            }
+        }
+
+        // Submit Borrow
+        async function submitBorrow(e) {
+            e.preventDefault();
+            const btn = document.getElementById('submit-borrow-btn');
+            btn.disabled = true;
+            btn.innerHTML = '⏳ กำลังบันทึก...';
+
+            const equipmentId = document.getElementById('selected-equipment-id').value;
+            const equipment = currentEquipment.find(eq => eq.id === equipmentId);
+
+            const record = {
+                equipmentId,
+                equipmentName: equipment.name,
+                equipmentIcon: equipment.icon,
+                studentName: document.getElementById('student-name').value,
+                studentId: document.getElementById('student-id').value,
+                quantity: parseInt(document.getElementById('borrow-quantity').value),
+                returnDate: document.getElementById('return-date').value,
+                borrowDate: new Date().toISOString(),
+                status: 'borrowed',
+                returnPhoto: null,
+                actualReturnDate: null
+            };
+
+            try {
+                if (isFirebaseInitialized) {
+                    const docRef = await db.collection('borrowRecords').add(record);
+                    record.id = docRef.id;
+                } else {
+                    record.id = 'local_' + Date.now();
+                }
+
+                borrowRecords.push(record);
+                equipment.available -= record.quantity;
+                renderEquipment();
+                closeBorrowModal();
+                showToast('ยืมอุปกรณ์สำเร็จ!', 'success');
+            } catch (error) {
+                console.error("Error:", error);
+                showToast('เกิดข้อผิดพลาด กรุณาลองใหม่', 'error');
+            }
+
+            btn.disabled = false;
+            btn.innerHTML = 'ยืนยันการยืม';
+        }
+
+        // Return List
+        function renderReturnList() {
+            const list = document.getElementById('return-list');
+            const borrowedItems = borrowRecords.filter(r => r.status === 'borrowed');
+
+            if (borrowedItems.length === 0) {
+                list.innerHTML = `
+                    <div class="text-center py-12 bg-white rounded-2xl">
+                        <div class="text-6xl mb-4">📦</div>
+                        <p class="text-gray-500">ไม่มีรายการที่ต้องคืน</p>
+                        <p class="text-gray-400 text-sm mt-2">ไปที่แท็บ "ยืมอุปกรณ์" เพื่อเริ่มยืม</p>
+                    </div>
+                `;
+                return;
+            }
+
+            list.innerHTML = borrowedItems.map(record => `
+                <div class="bg-white rounded-xl p-4 shadow-md">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <div class="text-4xl">${record.equipmentIcon}</div>
+                            <div>
+                                <h4 class="font-semibold text-gray-800">${record.equipmentName} x${record.quantity}</h4>
+                                <p class="text-sm text-gray-500">${record.studentName} (${record.studentId})</p>
+                                <p class="text-xs text-gray-400">กำหนดคืน: ${formatDate(record.returnDate)}</p>
+                            </div>
+                        </div>
+                        <button onclick="openReturnModal('${record.id}')" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors">
+                            คืน
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Return Modal
+        function openReturnModal(borrowId) {
+            const record = borrowRecords.find(r => r.id === borrowId);
+            if (!record) return;
+
+            document.getElementById('return-borrow-id').value = borrowId;
+            document.getElementById('return-modal-info').textContent = `${record.equipmentIcon} ${record.equipmentName} x${record.quantity}`;
+            document.getElementById('photo-preview-container').classList.add('hidden');
+            document.getElementById('photo-btn-text').textContent = 'เลือกรูปภาพ';
+            document.getElementById('return-form').reset();
+            document.getElementById('return-modal').classList.remove('hidden');
+        }
+
+        function closeReturnModal() {
+            document.getElementById('return-modal').classList.add('hidden');
+            document.getElementById('return-form').reset();
+        }
+
+        function previewReturnPhoto(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    document.getElementById('photo-preview').src = event.target.result;
+                    document.getElementById('photo-preview-container').classList.remove('hidden');
+                    document.getElementById('photo-btn-text').textContent = 'เปลี่ยนรูป';
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        // Submit Return - Fixed
+        async function submitReturn() {
+            const btn = document.getElementById('submit-return-btn');
+            
+            // Validation
+            const borrowId = document.getElementById('return-borrow-id').value;
+            const photoFile = document.getElementById('return-photo').files[0];
+            
+            if (!borrowId) {
+                showToast('เกิดข้อผิดพลาด: ไม่พบรหัสการยืม', 'error');
+                return;
+            }
+
+            if (!photoFile) {
+                showToast('กรุณาเลือกรูปภาพ', 'error');
+                return;
+            }
+
+            const recordIndex = borrowRecords.findIndex(r => r.id === borrowId);
+            if (recordIndex === -1) {
+                showToast('เกิดข้อผิดพลาด: ไม่พบรายการการยืม', 'error');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = '⏳ กำลังบันทึก...';
+
+            try {
+                // Convert to base64
+                const photoBase64 = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(photoFile);
+                });
+
+                // Update record
+                const record = borrowRecords[recordIndex];
+                record.status = 'pending';
+                record.returnPhoto = photoBase64;
+                record.actualReturnDate = new Date().toISOString();
+
+                // Save to Firebase if available
+                if (isFirebaseInitialized && db) {
+                    try {
+                        await db.collection('borrowRecords').doc(borrowId).update({
+                            status: 'pending',
+                            returnPhoto: photoBase64,
+                            actualReturnDate: record.actualReturnDate
+                        });
+                    } catch (fbError) {
+                        console.warn('Firebase save warning - data saved locally:', fbError.message);
+                    }
+                }
+
+                closeReturnModal();
+                renderReturnList();
+                showToast('ส่งคำขอคืนสำเร็จ! รอการอนุมัติ', 'success');
+                
+            } catch (error) {
+                console.error("Submit return error:", error);
+                showToast('เกิดข้อผิดพลาด: ' + error.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = 'ยืนยันการคืน';
+            }
+        }
+
+        // History
+        function renderHistory() {
+            const list = document.getElementById('history-list');
+            const searchTerm = document.getElementById('history-search').value.toLowerCase();
+            
+            let filtered = borrowRecords;
+            if (searchTerm) {
+                filtered = borrowRecords.filter(r => 
+                    r.studentId.toLowerCase().includes(searchTerm) ||
+                    r.studentName.toLowerCase().includes(searchTerm)
+                );
+            }
+
+            if (filtered.length === 0) {
+                list.innerHTML = `
+                    <div class="text-center py-12 bg-white rounded-2xl">
+                        <div class="text-6xl mb-4">📋</div>
+                        <p class="text-gray-500">ไม่พบประวัติการยืม</p>
+                    </div>
+                `;
+                return;
+            }
+
+            list.innerHTML = filtered.map(record => `
+                <div class="bg-white rounded-xl p-4 shadow-md">
+                    <div class="flex items-start justify-between">
+                        <div class="flex items-center gap-3">
+                            <div class="text-4xl">${record.equipmentIcon}</div>
+                            <div>
+                                <h4 class="font-semibold text-gray-800">${record.equipmentName} x${record.quantity}</h4>
+                                <p class="text-sm text-gray-600">${record.studentName} (${record.studentId})</p>
+                                <p class="text-xs text-gray-400">ยืมเมื่อ: ${formatDate(record.borrowDate)}</p>
+                                <p class="text-xs text-gray-400">กำหนดคืน: ${formatDate(record.returnDate)}</p>
+                            </div>
+                        </div>
+                        <span class="px-3 py-1 rounded-full text-xs font-medium ${getStatusClass(record.status)}">
+                            ${getStatusText(record.status)}
+                        </span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function filterHistory() {
+            renderHistory();
+        }
+
+        // Admin Panel
+        function toggleAdminPanel() {
+            const panel = document.getElementById('admin-panel');
+            panel.classList.toggle('hidden');
+            if (!panel.classList.contains('hidden')) {
+                renderAdminList();
+            }
+        }
+
+        function filterAdmin(filter) {
+            currentAdminFilter = filter;
+            document.querySelectorAll('.admin-filter').forEach(btn => {
+                btn.classList.remove('bg-gray-800', 'text-white');
+                btn.classList.add('bg-gray-100');
+            });
+            document.querySelector(`[data-filter="${filter}"]`).classList.remove('bg-gray-100');
+            document.querySelector(`[data-filter="${filter}"]`).classList.add('bg-gray-800', 'text-white');
+            renderAdminList();
+        }
+
+        function renderAdminList() {
+            const list = document.getElementById('admin-list');
+            let filtered = borrowRecords;
+
+            if (currentAdminFilter !== 'all') {
+                filtered = borrowRecords.filter(r => r.status === currentAdminFilter);
+            }
+
+            if (filtered.length === 0) {
+                list.innerHTML = `
+                    <div class="text-center py-12">
+                        <div class="text-6xl mb-4">📋</div>
+                        <p class="text-gray-500">ไม่มีรายการ</p>
+                    </div>
+                `;
+                return;
+            }
+
+            list.innerHTML = filtered.map(record => `
+                <div class="p-4 border-b hover:bg-gray-50">
+                    <div class="flex items-start justify-between mb-2">
+                        <div class="flex items-center gap-3">
+                            <div class="text-3xl">${record.equipmentIcon}</div>
+                            <div>
+                                <h4 class="font-semibold text-gray-800">${record.equipmentName} x${record.quantity}</h4>
+                                <p class="text-sm text-gray-600">${record.studentName}</p>
+                                <p class="text-xs text-gray-500">รหัส: ${record.studentId}</p>
+                            </div>
+                        </div>
+                        <span class="px-3 py-1 rounded-full text-xs font-medium ${getStatusClass(record.status)}">
+                            ${getStatusText(record.status)}
+                        </span>
+                    </div>
+                    <div class="text-xs text-gray-400 mb-2">
+                        <p>ยืมเมื่อ: ${formatDateTime(record.borrowDate)}</p>
+                        <p>กำหนดคืน: ${formatDate(record.returnDate)}</p>
+                        ${record.actualReturnDate ? `<p>คืนเมื่อ: ${formatDateTime(record.actualReturnDate)}</p>` : ''}
+                    </div>
+                    ${record.returnPhoto ? `
+                        <div class="mb-2">
+                            <button onclick="showImage('${record.returnPhoto.replace(/'/g, "\\'")}')" class="text-sm text-blue-600 hover:underline flex items-center gap-1">
+                                📷 ดูรูปหลักฐาน
+                            </button>
+                        </div>
+                    ` : ''}
+                    ${record.status === 'pending' ? `
+                        <button onclick="approveReturn('${record.id}')" class="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium transition-colors">
+                            ✅ อนุมัติการคืน
+                        </button>
+                    ` : ''}
+                </div>
+            `).join('');
+        }
+
+        function approveReturn(borrowId) {
+            const record = borrowRecords.find(r => r.id === borrowId);
+            if (!record) return;
+
+            const equipment = currentEquipment.find(e => e.id === record.equipmentId);
+
+            record.status = 'approved';
+            equipment.available += record.quantity;
+
+            if (isFirebaseInitialized && db) {
+                try {
+                    db.collection('borrowRecords').doc(borrowId).update({
+                        status: 'approved'
+                    });
+                } catch (error) {
+                    console.error("Firebase update error:", error);
+                }
+            }
+
+            renderAdminList();
+            renderEquipment();
+            showToast('อนุมัติการคืนสำเร็จ!', 'success');
+        }
+
+        // Image Modal
+        function showImage(url) {
+            document.getElementById('preview-image').src = url;
+            document.getElementById('image-modal').classList.remove('hidden');
+        }
+
+        function closeImageModal() {
+            document.getElementById('image-modal').classList.add('hidden');
+        }
+
+        // Load Records from Firebase
+        async function loadBorrowRecords() {
+            if (!isFirebaseInitialized) {
+                console.log("Firebase not initialized, using local storage only");
+                return;
+            }
+
+            try {
+                const snapshot = await db.collection('borrowRecords').get();
+                borrowRecords = [];
+                
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    data.id = doc.id;
+                    borrowRecords.push(data);
+
+                    // Update equipment availability
+                    if (data.status === 'borrowed' || data.status === 'pending') {
+                        const eq = currentEquipment.find(e => e.id === data.equipmentId);
+                        if (eq) {
+                            eq.available -= data.quantity;
+                        }
+                    }
+                });
+
+                console.log("Loaded " + borrowRecords.length + " records from Firebase");
+                renderEquipment();
+            } catch (error) {
+                console.error("Error loading records:", error);
+                showToast('ไม่สามารถโหลดข้อมูลจาก Firebase', 'error');
+            }
+        }
+
+        // Helper Functions
+        function formatDate(dateStr) {
+            if (!dateStr) return '-';
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' });
+        }
+
+        function formatDateTime(dateStr) {
+            if (!dateStr) return '-';
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('th-TH', { 
+                year: 'numeric', month: 'short', day: 'numeric',
+                hour: '2-digit', minute: '2-digit'
+            });
+        }
+
+        function getStatusClass(status) {
+            const classes = {
+                borrowed: 'status-borrowed',
+                pending: 'status-pending',
+                approved: 'status-approved',
+                returned: 'status-returned'
+            };
+            return classes[status] || 'bg-gray-100 text-gray-700';
+        }
+
+        function getStatusText(status) {
+            const texts = {
+                borrowed: '📦 กำลังยืม',
+                pending: '⏳ รออนุมัติ',
+                approved: '✅ คืนแล้ว',
+                returned: '✅ คืนแล้ว'
+            };
+            return texts[status] || status;
+        }
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const bgColor = type === 'success' ? 'bg-emerald-600' : type === 'error' ? 'bg-red-600' : 'bg-blue-600';
+            
+            toast.className = `toast ${bgColor} text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-2`;
+            toast.innerHTML = `
+                <span>${type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️'}</span>
+                <span>${message}</span>
             `;
-        }).join('');
-    }
+            
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transition = 'opacity 0.3s';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
 
-    async function approve(id) {
-        await db.collection('borrows').doc(id).update({ status: 'returned' });
-        alert('อนุมัติแล้ว'); loadAdminData();
-    }
-
-    init();
-</script>
-</body>
+        // Initialize
+        initApp();
+    </script>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9cd2c942a4789cf6',t:'MTc3MDk2OTU2NS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
