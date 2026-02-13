@@ -1,4 +1,4 @@
-         <!doctype html>
+      <!doctype html>
 <html lang="th" class="h-full">
  <head>
   <meta charset="UTF-8">
@@ -245,7 +245,7 @@
         // ==================== ELEMENT SDK ====================
         const defaultConfig = {
             site_title: 'ระบบยืม-คืนอุปกรณ์กีฬา',
-            school_name: 'โรงเรียนสามร้อยยอดวิทยาคม'
+            school_name: 'โรงเรียนของคุณ'
         };
 
         if (window.elementSdk) {
@@ -523,6 +523,7 @@
         function closeReturnModal() {
             document.getElementById('return-modal').classList.add('hidden');
             document.getElementById('return-form').reset();
+            compressedImageFile = null;
         }
 
         async function previewReturnPhoto(event) {
@@ -591,8 +592,14 @@
 
         document.getElementById('return-form').addEventListener('submit', async (e) => {
             e.preventDefault();
+            
             const btn = document.getElementById('submit-return-btn');
             const borrowId = document.getElementById('return-borrow-id').value;
+
+            if (!borrowId || borrowId.trim() === '') {
+                showToast('❌ เกิดข้อผิดพลาด ไม่พบรหัสการยืม', 'error');
+                return;
+            }
 
             if (!compressedImageFile) {
                 showToast('❌ กรุณาถ่ายรูปหลักฐาน', 'error');
@@ -604,32 +611,73 @@
 
             try {
                 // Upload compressed image to Firebase Storage
-                const storageRef = storage.ref(`returns/${borrowId}_${Date.now()}`);
-                const snapshot = await storageRef.put(compressedImageFile);
-                const downloadUrl = await snapshot.ref.getDownloadURL();
-
-                // Update borrow record
-                await db.collection('borrows').doc(borrowId).update({
-                    status: 'pending',
-                    returnPhotoUrl: downloadUrl,
-                    returnRequestDate: new Date().toISOString(),
-                    imageSize: {
-                        original: originalImageSize,
-                        compressed: compressedImageSize,
-                        ratio: Math.round((1 - compressedImageSize / originalImageSize) * 100)
+                const timestamp = Date.now();
+                const randomStr = Math.random().toString(36).substring(2, 8);
+                const fileName = `returns/${borrowId}_${timestamp}_${randomStr}.jpg`;
+                const storageRef = storage.ref(fileName);
+                
+                // Upload with metadata
+                const uploadTask = storageRef.put(compressedImageFile, {
+                    customMetadata: {
+                        borrowId: borrowId,
+                        uploadTime: new Date().toISOString()
                     }
                 });
 
-                showToast('✅ ส่งคำขอคืนสำเร็จ! รอแอดมินอนุมัติ');
-                closeReturnModal();
-                
-                // Refresh student borrows
-                const studentId = document.getElementById('search-student-id').value;
-                if (studentId) renderStudentBorrows(studentId);
+                uploadTask.on('state_changed', 
+                    (snapshot) => {
+                        // Progress tracking
+                        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                        btn.textContent = `⏳ อัปโหลด ${Math.round(progress)}%`;
+                    },
+                    (error) => {
+                        console.error('Upload error:', error);
+                        showToast('❌ เกิดข้อผิดพลาดในการอัปโหลด: ' + error.message, 'error');
+                        btn.disabled = false;
+                        btn.textContent = '✅ ยืนยันการคืน';
+                    },
+                    async () => {
+                        try {
+                            const downloadUrl = await uploadTask.snapshot.ref.getDownloadURL();
+
+                            // Update borrow record
+                            const updateData = {
+                                status: 'pending',
+                                returnPhotoUrl: downloadUrl,
+                                returnRequestDate: new Date().toISOString()
+                            };
+
+                            // Only add imageSize if compression happened
+                            if (originalImageSize > 0 && compressedImageSize > 0) {
+                                updateData.imageSize = {
+                                    original: originalImageSize,
+                                    compressed: compressedImageSize,
+                                    ratio: Math.round((1 - compressedImageSize / originalImageSize) * 100)
+                                };
+                            }
+
+                            await db.collection('borrows').doc(borrowId).update(updateData);
+
+                            showToast('✅ ส่งคำขอคืนสำเร็จ! รอแอดมินอนุมัติ');
+                            closeReturnModal();
+                            
+                            // Refresh student borrows
+                            const studentId = document.getElementById('search-student-id').value;
+                            if (studentId) {
+                                setTimeout(() => renderStudentBorrows(studentId), 500);
+                            }
+                        } catch (error) {
+                            console.error("Error updating document:", error);
+                            showToast('❌ เกิดข้อผิดพลาดในการบันทึก: ' + error.message, 'error');
+                        } finally {
+                            btn.disabled = false;
+                            btn.textContent = '✅ ยืนยันการคืน';
+                        }
+                    }
+                );
             } catch (error) {
-                console.error("Error submitting return:", error);
-                showToast('❌ เกิดข้อผิดพลาด กรุณาลองใหม่', 'error');
-            } finally {
+                console.error("Error in return submission:", error);
+                showToast('❌ เกิดข้อผิดพลาด: ' + error.message, 'error');
                 btn.disabled = false;
                 btn.textContent = '✅ ยืนยันการคืน';
             }
@@ -738,5 +786,5 @@
         // ==================== INITIALIZATION ====================
         renderEquipmentGrid();
     </script>
- <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9cd1f49f4564a18a',t:'MTc3MDk2MDg1NS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9cd20613f023a193',t:'MTc3MDk2MTU3MC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
